@@ -1,146 +1,374 @@
-# FEASTLINK — Surplus Food Redistribution System
 
-A full-stack Next.js application for connecting event organizers who have surplus food with shelter homes that can use it. Built from the FEASTLINK project report and designed to demonstrate the PES University DBMS Level 3 evaluation criteria.
-
-## Stack
-
-- **Frontend:** Next.js 14 App Router, React, TypeScript, custom responsive UI
-- **Backend:** Next.js Route Handlers (REST API)
-- **Primary database:** MySQL 8+ / InnoDB for relational, transactional business data
-- **NoSQL database:** MongoDB for append-only activity logs and notifications
-- **Authentication:** bcrypt password hashing + signed JWT in an HttpOnly cookie
-
-## Features
-
-- Organizer and Shelter Admin registration/login, plus Admin role support in the database
-- Organizer dashboard, event and surplus-food listing workflow
-- Shelter food discovery and meal request workflow
-- Organizer approval/rejection of requests; approval creates allocation and delivery records atomically
-- Delivery progression: Pending → Picked up → In transit → Delivered
-- Shelter donation-history capture after delivery, including meals served and beneficiary count
-- Role-scoped request, delivery and impact-history views
-- Dashboard metrics, responsive layouts, search, validation, status badges and audit logging
-
-## Database design
-
-The MySQL schema follows the eight entities and relationships in the project report (Users, Events, Shelter Homes, Surplus Food, Food Requests, Food Allocations, Delivery, Donation History). It adds practical indexes, CHECK constraints and timestamps while preserving the report's one-to-many and optional one-to-one relationships.
-
-### Advanced DBMS concepts implemented
-
-1. **Trigger** `trg_request_approved`: synchronizes a food listing's status when a request is approved or released.
-2. **Stored function** `meals_remaining(food_id)`: calculates remaining meal capacity.
-3. **Stored procedure** `approve_food_request(request_id, allocated_meals)`: validates and creates an allocation + delivery record.
-4. **Transactions**: registration, food publishing, request creation, approval and donation-history recording use explicit `BEGIN`, `COMMIT`, `ROLLBACK` boundaries in the API.
-5. **Indexes**: composite status/expiry indexes, foreign-key lookup indexes, unique constraints and a FULLTEXT food-name index.
-6. **Joins and aggregation**: dashboard, request, delivery and impact reports use multi-table joins; `v_food_distribution` is a join-backed reporting view.
-
-MongoDB is deliberately not used as a replacement for relational transactions. It stores `activity_logs` and `notifications`, where flexible document records and append-only writes are appropriate. The core business state remains in MySQL.
-
-## Local setup
-
-### Requirements
-
-- Node.js 18.17+ (Node 20 LTS recommended)
-- MySQL 8.0+
-- MongoDB 6+ (local Community Server or MongoDB Atlas)
-
-### 1. Configure databases
-
-Create the MySQL schema and advanced objects:
-
-```bash
-mysql -u root -p < database/schema.sql
-```
-
-Copy the environment template and set credentials:
-
-```bash
-cp .env.example .env.local
-```
-
-Set `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DATABASE`, `MONGODB_URI`, `MONGODB_DATABASE`, and a long random `JWT_SECRET` (32+ characters). For Atlas, use the MongoDB connection string supplied by Atlas.
-
-### 2. Install and run
-
-```bash
-npm install
-npm run dev
-```
-
-Open http://localhost:3000.
-
-### 3. Optional demo data
-
-```bash
-node database/seed.mjs
-```
-
-Demo accounts (only created by the optional seed script):
-
-- Organizer: `organizer@feastlink.demo` / `FeastLink@123`
-- Shelter: `shelter@feastlink.demo` / `FeastLink@123`
-
-Change these credentials and never seed demo accounts into a public production database.
-
-## Main application routes
-
-| Route | Purpose |
-|---|---|
-| `/login`, `/register` | Authentication and onboarding |
-| `/dashboard` | Role-aware impact overview |
-| `/food` | Browse available surplus food |
-| `/food/new` | Organizer food listing form |
-| `/requests` | Shelter requests and organizer approvals |
-| `/deliveries` | Pickup, transit and delivery status |
-| `/history` | Donation records and impact totals |
-
-## API routes
-
-- `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`
-- `GET/POST /api/food`
-- `GET/POST /api/requests`, `POST/PATCH /api/requests/:id/approve`
-- `GET/PATCH /api/deliveries`
-- `GET/POST /api/history`
-- `GET /api/dashboard`
-
-All protected APIs verify the session and enforce role permissions server-side. Passwords are never returned by the API.
-
-## Deployment
-
-### Vercel (recommended for the Next.js frontend/API)
-
-1. Push this repository to GitHub.
-2. Import the repository in Vercel.
-3. Add the environment variables from `.env.example` in Project Settings → Environment Variables.
-4. Provision MySQL on a managed provider that supports MySQL 8 (for example, Aiven, Railway, or AWS RDS) and MongoDB Atlas; allow the Vercel deployment to connect to both.
-5. Run `database/schema.sql` once against the production MySQL instance using a secure SQL client. Do not run schema creation on every application request.
-6. Deploy. Vercel runs `npm run build` and `npm start` is managed by the platform.
-
-For a traditional Node host, run `npm install`, `npm run build`, then `npm start` with the same environment variables and a reverse proxy/HTTPS in front.
-
-## Important production hardening
-
-- Use managed database TLS, network allowlists/private networking and least-privilege DB users.
-- Replace the development JWT secret; rotate it if exposed.
-- Configure backups and retention for both databases.
-- Add rate limiting, email verification, password reset and CSRF/origin protections before public launch.
-- Add an explicit food-safety checklist and moderation process before allowing public listings. The app currently captures prepared and expiry times but does not certify food safety.
-- MongoDB logging is best-effort; core transactional state and permissions do not depend on MongoDB being online.
-
-## Notes
-
-The app requires reachable MySQL and MongoDB instances and valid environment variables to operate fully. The source bundle is deployable, but it is not automatically hosted or connected to your cloud database by this download.
-
-
-## Team Members
+# FEASTLINK
+### Surplus Food Redistribution System for Functions and Shelter Homes
 
 **Course:** Database Management Systems (UE23CS351A)  
 **University:** PES University  
-**Semester:** 5th Semester
-
-| Name | SRN | Section | Responsibilities |
-|---|---|---|---|
-| Saransh Mittal | PES1UG24AM254 | 5E | Organizer module, event creation, surplus food management, MySQL schema, advanced SQL, organizer dashboard and integration |
-| T Surya | PES1UG24AM300 | 5E | Shelter registration and dashboard, food browsing and requests, MongoDB notifications and activity logs, testing and documentation |
-
+**Semester:** 5th Semester  
+**Academic Year:** 2026  
 **Project Guide:** Junaid Rasool
+
+---
+
+## Team Members
+
+| Name | SRN | Section |
+|---|---|---|
+| Saransh Mittal | PES1UG24AM254 | 5E |
+| T Surya | PES1UG24AM300 | 5E |
+
+---
+
+## 1. Project Overview
+
+FEASTLINK is a web-based surplus food redistribution platform designed to reduce food wastage by connecting event organizers with nearby shelter homes.
+
+Functions, celebrations and other events often generate surplus food that goes unused. At the same time, shelter homes and communities may need additional food resources.
+
+FEASTLINK provides a platform where organizers can list surplus food, shelter homes can browse available food and submit requests, and organizers can approve requests and coordinate food distribution.
+
+The system aims to make food redistribution more organized, transparent and efficient.
+
+## 2. Objectives
+
+- Reduce food wastage generated by functions and events.
+- Connect event organizers with shelter homes.
+- Allow organizers to manage events and surplus food listings.
+- Enable shelter homes to browse and request available food.
+- Provide an approval and allocation workflow.
+- Track food deliveries and completed donations.
+- Maintain reliable transactional records using MySQL.
+- Store notifications and activity logs using MongoDB.
+
+## 3. Key Features
+
+### Organizer Module
+- Organizer registration and login.
+- Create and manage events.
+- Add surplus food listings.
+- Specify food type, quantity and estimated meals.
+- View incoming food requests.
+- Approve or reject requests.
+- Monitor food allocation and delivery status.
+- View donation history and dashboard statistics.
+
+### Shelter Home Module
+- Shelter home registration and login.
+- Maintain shelter profile information.
+- Browse available surplus food.
+- View food details and availability.
+- Submit food requests.
+- Track request and delivery status.
+- View donation history.
+
+### Admin and Authentication
+- Role-based authentication.
+- Separate access for organizers, shelter administrators and administrators.
+- Password hashing using bcrypt.
+- Session management.
+- Protected application routes.
+
+### Food Distribution Management
+- Food request management.
+- Approval-based food allocation.
+- Prevention of over-allocation through availability validation.
+- Delivery status tracking.
+- Donation history management.
+
+### Notifications and Activity Logs
+- MongoDB-based activity logging.
+- User login and logout tracking.
+- Notifications for relevant food distribution activities.
+
+## 4. Technology Stack
+
+| Technology | Purpose |
+|---|---|
+| Next.js 14 | Full-stack web application framework |
+| React | Frontend user interface |
+| TypeScript | Application development |
+| MySQL 8.0 | Relational database |
+| MongoDB 8.0 | Activity logs and notifications |
+| Node.js | Backend runtime |
+| mysql2 | MySQL connectivity |
+| MongoDB Node.js Driver | MongoDB connectivity |
+| bcryptjs | Password hashing |
+| CSS | Application styling |
+
+## 5. Database Design
+
+FEASTLINK uses a hybrid database architecture.
+
+**MySQL** is the primary relational database used for structured records and transactional operations.
+
+**MongoDB** is used for activity logs and notifications.
+
+### MySQL Tables
+
+| Table | Description |
+|---|---|
+| users | Stores user information and roles |
+| events | Stores event details created by organizers |
+| shelter_homes | Stores shelter home profiles |
+| surplus_food | Stores surplus food listings |
+| food_requests | Stores requests submitted by shelters |
+| food_allocations | Stores approved food allocations |
+| delivery | Tracks food delivery information |
+| donation_history | Stores completed donation records |
+
+### Database Relationships
+
+- One organizer can create multiple events.
+- One event can have multiple surplus food listings.
+- One shelter home can submit multiple food requests.
+- One food listing can receive multiple requests.
+- An approved request can generate a food allocation.
+- An allocation can have a delivery record.
+- An allocation can have a donation history record.
+
+### Advanced SQL Features
+
+- Primary keys and foreign keys.
+- UNIQUE and NOT NULL constraints.
+- SQL JOIN operations.
+- Aggregate functions.
+- Views.
+- Stored procedures.
+- Stored functions.
+- Triggers.
+- Indexing.
+- Transactions.
+
+### Database Objects
+
+| Object | Name |
+|---|---|
+| View | `v_food_distribution` |
+| Trigger | `trg_request_approved` |
+| Stored Procedure | `approve_food_request` |
+| Stored Function | `meals_remaining` |
+
+## 6. Food Request and Approval Workflow
+
+1. An organizer creates an event.
+2. The organizer adds surplus food to the platform.
+3. A shelter home browses available food.
+4. The shelter submits a food request.
+5. The request is initially marked as PENDING.
+6. The organizer reviews the request.
+7. The organizer approves or rejects it.
+8. Upon approval, the system creates a food allocation.
+9. Delivery information is recorded and updated.
+10. Once delivery is completed, the donation history is maintained.
+
+**Availability management:** Pending requests do not reduce the displayed available meal quantity. Only approved requests reduce the remaining availability. The system checks availability again during approval to prevent over-allocation.
+
+## 7. Project Structure
+
+```text
+FEASTLINK/
+│
+├── app/
+│   ├── api/
+│   │   ├── auth/
+│   │   ├── dashboard/
+│   │   ├── deliveries/
+│   │   ├── food/
+│   │   ├── history/
+│   │   └── requests/
+│   │
+│   ├── dashboard/
+│   ├── deliveries/
+│   ├── food/
+│   ├── history/
+│   ├── login/
+│   ├── register/
+│   └── requests/
+│
+├── components/
+│   └── AppShell.tsx
+│
+├── database/
+│   ├── schema.sql
+│   ├── advanced_queries.sql
+│   └── seed.mjs
+│
+├── lib/
+│   ├── auth.ts
+│   ├── db.ts
+│   └── http.ts
+│
+├── .env.example
+├── .gitignore
+├── package.json
+├── package-lock.json
+├── next.config.js
+├── next-env.d.ts
+├── tsconfig.json
+└── README.md
+```
+
+## 8. Installation and Setup
+
+### Prerequisites
+
+- Node.js and npm.
+- MySQL Server 8.0.
+- MongoDB Server 8.0.
+- Git.
+
+### Step 1: Clone the Repository
+
+```bash
+git clone https://github.com/saransh1890/FEASTLINK-DBMS.git
+```
+
+### Step 2: Navigate to the Project
+
+```bash
+cd FEASTLINK-DBMS
+```
+
+### Step 3: Install Dependencies
+
+```bash
+npm install
+```
+
+### Step 4: Configure Environment Variables
+
+Create a `.env.local` file in the root project directory.
+
+Add the following configuration and replace the placeholder values with your local database credentials:
+
+```env
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_USER=your_mysql_username
+MYSQL_PASSWORD=your_mysql_password
+MYSQL_DATABASE=feastlink
+
+MONGODB_URI=mongodb://127.0.0.1:27017
+MONGODB_DATABASE=feastlink_logs
+
+JWT_SECRET=your_long_random_secret_at_least_32_characters
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
+
+**Important:** Never upload `.env.local` or actual database passwords to GitHub.
+
+### Step 5: Set Up MySQL
+
+Start your MySQL server and create the database:
+
+```sql
+CREATE DATABASE feastlink;
+```
+
+Select the database:
+
+```sql
+USE feastlink;
+```
+
+Import the database schema:
+
+```bash
+mysql -u your_mysql_username -p feastlink < database/schema.sql
+```
+
+Execute the advanced SQL queries and database objects from:
+
+```text
+database/advanced_queries.sql
+```
+
+### Step 6: Set Up MongoDB
+
+Start your MongoDB server.
+
+The application uses:
+
+```text
+mongodb://127.0.0.1:27017
+```
+
+The database used by FEASTLINK is:
+
+```text
+feastlink_logs
+```
+
+### Step 7: Run the Application
+
+Start the development server:
+
+```bash
+npm run dev
+```
+
+Open your browser and visit:
+
+```text
+http://localhost:3000
+```
+
+## 9. Application Modules
+
+The application provides the following main pages:
+
+- Home Page
+- Login and Registration
+- Organizer Dashboard
+- Shelter Dashboard
+- Food Listings
+- Add Surplus Food
+- Food Requests
+- Deliveries
+- Donation History
+
+## 10. Future Enhancements
+
+- Location-based matching between organizers and shelters.
+- Real-time notifications.
+- Automated food expiry alerts.
+- Delivery partner integration.
+- Interactive maps for food pickup locations.
+- Analytics for food wastage reduction and community impact.
+
+## 11. Team Contributions
+
+### Saransh Mittal
+
+- Organizer module development.
+- Event creation and management.
+- Surplus food management.
+- MySQL database schema design.
+- Advanced SQL implementation.
+- Organizer dashboard development.
+- Application integration.
+
+### T Surya
+
+- Shelter registration and profile management.
+- Shelter dashboard development.
+- Food browsing and request functionality.
+- MongoDB notification and activity log integration.
+- Application testing.
+- Project documentation.
+
+## 12. Conclusion
+
+FEASTLINK demonstrates how database management systems can be applied to solve a real-world problem.
+
+By connecting event organizers with shelter homes, the platform provides a structured process for managing surplus food, handling requests, approving allocations and tracking deliveries.
+
+The integration of MySQL and MongoDB demonstrates the use of relational and NoSQL databases within a single application.
+
+The project aims to encourage responsible food utilization and reduce unnecessary food wastage.
+
+---
+
+**Developed as part of the Database Management Systems course at PES University.**
+
+**GitHub Repository:** https://github.com/saransh1890/FEASTLINK-DBMS
