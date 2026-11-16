@@ -130,3 +130,17 @@ For a traditional Node host, run `npm install`, `npm run build`, then `npm start
 ## Notes
 
 The app requires reachable MySQL and MongoDB instances and valid environment variables to operate fully. The source bundle is deployable, but it is not automatically hosted or connected to your cloud database by this download.
+
+
+## Team Members
+
+**Course:** Database Management Systems (UE23CS351A)  
+**University:** PES University  
+**Semester:** 5th Semester
+
+| Name | SRN | Section | Responsibilities |
+|---|---|---|---|
+| Saransh Mittal | PES1UG24AM254 | 5E | Organizer module, event creation, surplus food management, MySQL schema, advanced SQL, organizer dashboard and integration |
+| T Surya | PES1UG24AM300 | 5E | Shelter registration and dashboard, food browsing and requests, MongoDB notifications and activity logs, testing and documentation |
+
+**Project Guide:** Junaid Rasool
